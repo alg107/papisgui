@@ -20,8 +20,7 @@ def docbyref(ref):
         if d['ref'] == ref:
             return d
 
-#load_docs(p.get_lib_name())
-load_docs("uc")
+load_docs(p.get_lib_name())
 
 class TableModel(QAbstractTableModel):
     def rowCount(self, parent):
