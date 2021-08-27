@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+import papis.api as p
+import papis
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+import clipboard
+
+docs = []
+headers = ["Author", "Title", "Year", "ref"]
+rows = []
+
+def load_docs(lib):
+    global docs
+    global rows
+    docs = p.get_all_documents_in_lib(lib)
+    rows = [(a['author'], a['title'], a['year'], a['ref']) for a in docs]
+
+def docbyref(ref):
+    for d in docs:
+        if d['ref'] == ref:
+            return d
+
+#load_docs(p.get_lib_name())
+load_docs("uc")
+
+class TableModel(QAbstractTableModel):
+    def rowCount(self, parent):
+        return len(rows)
+    def columnCount(self, parent):
+        return len(headers)
+    def data(self, index, role):
+        if role != Qt.DisplayRole:
+            return QVariant()
+        return rows[index.row()][index.column()]
+    def headerData(self, section, orientation, role):
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+            return QVariant()
+        return headers[section]
+
+class FilMo(QSortFilterProxyModel):
+    def filterAcceptsRow(self, srow, sparent):
+        bigbool = False
+        re = str(self.filterRegExp().pattern()).lower()
+        for i, d in enumerate(headers[:-1]):
+            colstr = str(self.sourceModel().index(srow,i).data()).lower()
+            #print(re in colstr)
+            bigbool = bigbool or (re in colstr)
+        return bigbool
+
+
+
+def click_row(e):
+    sm = view.selectionModel()
+    idx = sm.selectedRows()[0].row()
+    ref = filtermodel.index(idx,len(headers)-1).data()
+    doc = docbyref(ref)
+    p.open_file(doc.get_files()[0])
+
+def open_menu(pos):
+    sm = view.selectionModel()
+    idx = sm.selectedRows()[0].row()
+    ref = filtermodel.index(idx,len(headers)-1).data()
+    doc = docbyref(ref)
+    menu = QMenu()
+    exportAction = menu.addAction("Export")
+    action = menu.exec_(view.mapToGlobal(pos))
+    if action == exportAction:
+        bibtex = papis.bibtex.to_bibtex(doc)
+        clipboard.copy(bibtex)
+
+
+app = QApplication([])
+#window = QWidget()
+
+
+def onkey(e):
+    QLineEdit.keyPressEvent(sbar,e)
+    txt = sbar.text()
+    filtermodel.setFilterFixedString(txt)
+
+def onlibchange(e):
+    model.beginResetModel()
+    newlib = libpicker.currentText()
+    load_docs(newlib)
+    model.endResetModel()
+    view.reset()
+
+mainlayout = QVBoxLayout()
+model = TableModel()
+view = QTableView()
+
+sbar = QLineEdit()
+libpicker = QComboBox()
+libpicker.addItems(p.get_libraries())
+libpicker.setCurrentText(p.get_lib_name())
+libpicker.currentTextChanged.connect(onlibchange)
+sbar.keyPressEvent = onkey
+mainlayout.addWidget(libpicker)
+mainlayout.addWidget(sbar)
+#filtermodel = QSortFilterProxyModel()
+filtermodel = FilMo(None)
+filtermodel.setSourceModel(model)
+filtermodel.setFilterFixedString("")
+filtermodel.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+
+view.setSelectionBehavior(QAbstractItemView.SelectRows)
+view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+view.setModel(filtermodel)
+#view.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+view.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+view.verticalHeader().setVisible(False)
+view.setColumnHidden(len(headers)-1, True)
+view.setContextMenuPolicy(Qt.CustomContextMenu)
+view.customContextMenuRequested.connect(open_menu)
+view.mouseDoubleClickEvent = click_row
+mainlayout.addWidget(view)
+
+
+qw = QWidget()
+qw.setLayout(mainlayout)
+qw.show()
+app.exec_()
