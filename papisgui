@@ -57,14 +57,19 @@ def click_row(e):
 
 def open_menu(pos):
     sm = view.selectionModel()
-    idx = sm.selectedRows()[0].row()
-    ref = filtermodel.index(idx,len(headers)-1).data()
-    doc = docbyref(ref)
+    #idxs = sm.selectedRows()[0].row()
+    idxs = sm.selectedRows()
+    docs = []
+    for i in idxs:
+        idx = i.row()
+        ref = filtermodel.index(idx,len(headers)-1).data()
+        doc = docbyref(ref)
+        docs.append(doc)
     menu = QMenu()
     exportAction = menu.addAction("Export")
     action = menu.exec_(view.mapToGlobal(pos))
     if action == exportAction:
-        bibtex = papis.bibtex.to_bibtex(doc)
+        bibtex = papis.bibtex.exporter(docs)
         clipboard.copy(bibtex)
 
 
