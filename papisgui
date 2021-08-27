@@ -28,7 +28,7 @@ def load_docs(lib):
     global docs
     global rows
     docs = p.get_all_documents_in_lib(lib)
-    rows = [(a['author'], a['title'], a['year'], i) for i,a in enumerate(docs)]
+    rows = [(a['author'], a['title'], str(a['year'])+"    ", i) for i,a in enumerate(docs)]
     load_texts(lib)
 
 
@@ -92,22 +92,13 @@ class ViewTree(QTreeWidget):
 
         fill_item(self.invisibleRootItem(), value)
 
-class NewWindow(QWidget):
-    """
-    This "window" is a QWidget. If it has no parent, it
-    will appear as a free-floating window as we want.
-    """
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        self.label = QLabel("Properties")
-        layout.addWidget(self.label)
-        self.setLayout(layout)
-
 
 def click_row(e):
     sm = view.selectionModel()
-    idx = sm.selectedRows()[0].row()
+    try:
+        idx = sm.selectedRows()[0].row()
+    except:
+        return 
     idd = filtermodel.index(idx,len(headers)-1).data()
     doc = docbyid(idd)
     p.open_file(doc.get_files()[0])
@@ -126,6 +117,7 @@ def open_menu(pos):
     exportAction = menu.addAction("Export")
     propertiesAction = menu.addAction("Properties")
     action = menu.exec_(view.mapToGlobal(pos))
+    if len(docs) == 0: return
     if action == exportAction:
         bibtex = papis.bibtex.exporter(docs)
         clipboard.copy(bibtex)
@@ -142,6 +134,9 @@ app = QApplication([])
 
 
 def onkey2(e):
+    if e.key() == Qt.Key_Return:
+        view.setFocus(True)
+        view.selectRow(0)
     QLineEdit.keyPressEvent(sbar2,e)
     txt = sbar2.text()
     filtermodel.setFilterFixedString(txt)
@@ -149,6 +144,9 @@ def onkey2(e):
     statusbar.showMessage(f"Row Count: {n}")
 
 def onkey(e):
+    if e.key() == Qt.Key_Return:
+        view.setFocus(True)
+        view.selectRow(0)
     QLineEdit.keyPressEvent(sbar,e)
     txt = sbar.text()
     interfiltermodel.setFilterFixedString(txt)
@@ -161,8 +159,35 @@ def onlibchange(e):
     load_docs(newlib)
     model.endResetModel()
     view.reset()
+    n = filtermodel.rowCount()
+    statusbar.showMessage(f"Row Count: {n}")
+
+def onresize(e):
+    view.setColumnWidth(0,int(view.width()/6.0))
+    view.setColumnWidth(1,int(view.width()/3.0))
+    view.setColumnWidth(2,int(view.width()/6.0))
+    #QWidget.resizeEvent(e)
+
+
+def tableKey(e):
+    if view.hasFocus():
+        if e.key() == Qt.Key_Return:
+            click_row(e)
+    e.accept()
+    QTableView.keyPressEvent(view, e)
+
+def generalkey(e):
+    if e.modifiers() == Qt.ControlModifier:
+        if e.key() == Qt.Key_L:
+            sbar.setFocus(True)
+        elif e.key() == Qt.Key_S:
+            sbar2.setFocus(True)
+        elif e.key() == Qt.Key_P:
+            libpicker.showPopup()
+    QWidget.keyPressEvent(qw, e)
 
 mainlayout = QVBoxLayout()
+
 model = TableModel()
 view = QTableView()
 
@@ -189,15 +214,19 @@ filtermodel.setSourceModel(interfiltermodel)
 filtermodel.setFilterFixedString("")
 
 view.setSelectionBehavior(QAbstractItemView.SelectRows)
-view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 view.setModel(filtermodel)
-#view.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
 view.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+view.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+view.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+view.resizeEvent = lambda _: view.setColumnWidth(0,int(view.width()/4.0))
+#view.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
 view.verticalHeader().setVisible(False)
 view.setColumnHidden(len(headers)-1, True)
 view.setContextMenuPolicy(Qt.CustomContextMenu)
 view.customContextMenuRequested.connect(open_menu)
 view.mouseDoubleClickEvent = click_row
+view.keyPressEvent = tableKey
 mainlayout.addWidget(view)
 
 statusbar = QStatusBar()
@@ -208,6 +237,8 @@ mainlayout.addWidget(statusbar)
 
 qw = QWidget()
 qw.setLayout(mainlayout)
+#qw.resizeEvent = onresize
+qw.keyPressEvent = generalkey
 qw.resize(1000,600)
 qw.show()
 sbar.setFocus()
