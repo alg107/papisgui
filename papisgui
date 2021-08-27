@@ -8,12 +8,27 @@ import clipboard
 docs = []
 headers = ["Author", "Title", "Year", "ref"]
 rows = []
+texts = []
+
+def load_texts(lib):
+    global docs
+    for j,i in enumerate(docs):
+        fldr = i.get_main_folder()
+        ftext = ""
+        try:
+            with open(f"{fldr}/text.txt", "r") as f:
+                ftext = f.read()
+        except:
+            pass
+        docs[j]['full_text'] = ftext
 
 def load_docs(lib):
     global docs
     global rows
     docs = p.get_all_documents_in_lib(lib)
     rows = [(a['author'], a['title'], a['year'], a['ref']) for a in docs]
+    load_texts(lib)
+
 
 def docbyref(ref):
     for d in docs:
@@ -46,6 +61,12 @@ class FilMo(QSortFilterProxyModel):
             bigbool = bigbool or (re in colstr)
         return bigbool
 
+class FilMo2(QSortFilterProxyModel):
+    def filterAcceptsRow(self, srow, sparent):
+        re = str(self.filterRegExp().pattern()).lower()
+        ref = str(self.sourceModel().index(srow,3).data())
+        doc = docbyref(ref)
+        return re in doc['full_text'].lower()
 
 
 def click_row(e):
@@ -77,10 +98,15 @@ app = QApplication([])
 #window = QWidget()
 
 
+def onkey2(e):
+    QLineEdit.keyPressEvent(sbar2,e)
+    txt = sbar2.text()
+    filtermodel.setFilterFixedString(txt)
+
 def onkey(e):
     QLineEdit.keyPressEvent(sbar,e)
     txt = sbar.text()
-    filtermodel.setFilterFixedString(txt)
+    interfiltermodel.setFilterFixedString(txt)
 
 def onlibchange(e):
     model.beginResetModel()
@@ -94,18 +120,26 @@ model = TableModel()
 view = QTableView()
 
 sbar = QLineEdit()
+sbar2 = QLineEdit()
+sbar.setPlaceholderText("Search Metadata")
+sbar2.setPlaceholderText("Search In")
 libpicker = QComboBox()
 libpicker.addItems(p.get_libraries())
 libpicker.setCurrentText(p.get_lib_name())
 libpicker.currentTextChanged.connect(onlibchange)
 sbar.keyPressEvent = onkey
+sbar2.keyPressEvent = onkey2
 mainlayout.addWidget(libpicker)
 mainlayout.addWidget(sbar)
+mainlayout.addWidget(sbar2)
 #filtermodel = QSortFilterProxyModel()
-filtermodel = FilMo(None)
-filtermodel.setSourceModel(model)
+interfiltermodel = FilMo(None)
+interfiltermodel.setSourceModel(model)
+interfiltermodel.setFilterFixedString("")
+#interfiltermodel.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+filtermodel = FilMo2(None)
+filtermodel.setSourceModel(interfiltermodel)
 filtermodel.setFilterFixedString("")
-filtermodel.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
 
 view.setSelectionBehavior(QAbstractItemView.SelectRows)
 view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -119,8 +153,8 @@ view.customContextMenuRequested.connect(open_menu)
 view.mouseDoubleClickEvent = click_row
 mainlayout.addWidget(view)
 
-
 qw = QWidget()
 qw.setLayout(mainlayout)
 qw.show()
+sbar.setFocus()
 app.exec_()
