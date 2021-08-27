@@ -6,9 +6,11 @@ from PyQt5.QtCore import *
 import clipboard
 
 docs = []
-headers = ["Author", "Title", "Year", "ref"]
+headers = ["Author", "Title", "Year", "id"]
 rows = []
 texts = []
+
+extra_windows = []
 
 def load_texts(lib):
     global docs
@@ -26,16 +28,15 @@ def load_docs(lib):
     global docs
     global rows
     docs = p.get_all_documents_in_lib(lib)
-    rows = [(a['author'], a['title'], a['year'], a['ref']) for a in docs]
+    rows = [(a['author'], a['title'], a['year'], i) for i,a in enumerate(docs)]
     load_texts(lib)
 
 
-def docbyref(ref):
-    for d in docs:
-        if d['ref'] == ref:
-            return d
-
 load_docs(p.get_lib_name())
+
+def docbyid(i):
+    return docs[i]
+
 
 class TableModel(QAbstractTableModel):
     def rowCount(self, parent):
@@ -64,16 +65,51 @@ class FilMo(QSortFilterProxyModel):
 class FilMo2(QSortFilterProxyModel):
     def filterAcceptsRow(self, srow, sparent):
         re = str(self.filterRegExp().pattern()).lower()
-        ref = str(self.sourceModel().index(srow,3).data())
-        doc = docbyref(ref)
+        idd = self.sourceModel().index(srow,len(headers)-1).data()
+        doc = docbyid(idd)
         return re in doc['full_text'].lower()
+
+class ViewTree(QTreeWidget):
+    def __init__(self, value):
+        super().__init__()
+        def fill_item(item, value):
+            def new_item(parent, text, val=None):
+                child = QTreeWidgetItem([text])
+                fill_item(child, val)
+                parent.addChild(child)
+                child.setExpanded(True)
+            if value is None: return
+            elif isinstance(value, dict):
+                for key, val in sorted(value.items()):
+                    new_item(item, str(key), val)
+            elif isinstance(value, (list, tuple)):
+                for val in value:
+                    text = (str(val) if not isinstance(val, (dict, list, tuple))
+                            else '[%s]' % type(val).__name__)
+                    new_item(item, text, val) 
+            else:
+                new_item(item, str(value))
+
+        fill_item(self.invisibleRootItem(), value)
+
+class NewWindow(QWidget):
+    """
+    This "window" is a QWidget. If it has no parent, it
+    will appear as a free-floating window as we want.
+    """
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.label = QLabel("Properties")
+        layout.addWidget(self.label)
+        self.setLayout(layout)
 
 
 def click_row(e):
     sm = view.selectionModel()
     idx = sm.selectedRows()[0].row()
-    ref = filtermodel.index(idx,len(headers)-1).data()
-    doc = docbyref(ref)
+    idd = filtermodel.index(idx,len(headers)-1).data()
+    doc = docbyid(idd)
     p.open_file(doc.get_files()[0])
 
 def open_menu(pos):
@@ -83,15 +119,22 @@ def open_menu(pos):
     docs = []
     for i in idxs:
         idx = i.row()
-        ref = filtermodel.index(idx,len(headers)-1).data()
-        doc = docbyref(ref)
+        idd = filtermodel.index(idx,len(headers)-1).data()
+        doc = docbyid(idd)
         docs.append(doc)
     menu = QMenu()
     exportAction = menu.addAction("Export")
+    propertiesAction = menu.addAction("Properties")
     action = menu.exec_(view.mapToGlobal(pos))
     if action == exportAction:
         bibtex = papis.bibtex.exporter(docs)
         clipboard.copy(bibtex)
+    elif action == propertiesAction:
+        global extra_windows
+        win = ViewTree(docs[0])
+        extra_windows.append(win)
+        extra_windows[-1].show()
+
 
 
 app = QApplication([])
@@ -102,11 +145,15 @@ def onkey2(e):
     QLineEdit.keyPressEvent(sbar2,e)
     txt = sbar2.text()
     filtermodel.setFilterFixedString(txt)
+    n = filtermodel.rowCount()
+    statusbar.showMessage(f"Row Count: {n}")
 
 def onkey(e):
     QLineEdit.keyPressEvent(sbar,e)
     txt = sbar.text()
     interfiltermodel.setFilterFixedString(txt)
+    n = filtermodel.rowCount()
+    statusbar.showMessage(f"Row Count: {n}")
 
 def onlibchange(e):
     model.beginResetModel()
@@ -152,6 +199,12 @@ view.setContextMenuPolicy(Qt.CustomContextMenu)
 view.customContextMenuRequested.connect(open_menu)
 view.mouseDoubleClickEvent = click_row
 mainlayout.addWidget(view)
+
+statusbar = QStatusBar()
+n = filtermodel.rowCount()
+statusbar.showMessage(f"Row Count: {n}")
+mainlayout.addWidget(statusbar)
+
 
 qw = QWidget()
 qw.setLayout(mainlayout)
