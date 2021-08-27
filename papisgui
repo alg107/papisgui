@@ -101,7 +101,10 @@ def click_row(e):
         return 
     idd = filtermodel.index(idx,len(headers)-1).data()
     doc = docbyid(idd)
-    p.open_file(doc.get_files()[0])
+    try:
+        p.open_file(doc.get_files()[0])
+    except:
+        return
 
 def open_menu(pos):
     sm = view.selectionModel()
