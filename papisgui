@@ -155,6 +155,7 @@ mainlayout.addWidget(view)
 
 qw = QWidget()
 qw.setLayout(mainlayout)
+qw.resize(1000,600)
 qw.show()
 sbar.setFocus()
 app.exec_()
