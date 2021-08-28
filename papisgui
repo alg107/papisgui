@@ -48,10 +48,10 @@ class Library:
 
 
 
-headers = ["Author", "Title", "Reference", "Year"]
-names = ['author', 'title', 'ref', 'year']
-coltypes = [QHeaderView.Fixed, QHeaderView.Stretch, QHeaderView.Fixed, QHeaderView.ResizeToContents]
-colweights = [1,3,1,0]
+headers = ["Author", "Title",  "Year"]
+names = ['author', 'title', 'year']
+coltypes = [QHeaderView.Fixed, QHeaderView.Stretch, QHeaderView.ResizeToContents]
+colweights = [1,3,0]
 
 extra_windows = []
 
