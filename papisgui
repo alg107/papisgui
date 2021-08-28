@@ -330,8 +330,11 @@ libpicker.currentTextChanged.connect(onlibchange)
 colpicker = QListWidget()
 colpicker.addItems(lib.keys)
 colpicker.setSelectionMode(QAbstractItemView.MultiSelection)
-colpicker.setRowHidden(lib.keys.index("title"), True)
-colpicker.setRowHidden(lib.keys.index("full_text"), True)
+try:
+    colpicker.setRowHidden(lib.keys.index("title"), True)
+    colpicker.setRowHidden(lib.keys.index("full_text"), True)
+except:
+    pass
 for h in lib.names:
     colpicker.item(lib.keys.index(h)).setSelected(True)
 colpicker.itemSelectionChanged.connect(colpicker_change)
