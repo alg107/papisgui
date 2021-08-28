@@ -15,10 +15,6 @@ class Library:
         self.colweights = colweights
         self.load_docs(p.get_lib_name())
 
-        keys = set()
-        for d in self.docs:
-            keys.update(d.keys())
-        self.keys = list(keys)
 
     def load_texts(self):
         for j,i in enumerate(self.docs):
@@ -44,6 +40,10 @@ class Library:
     def load_docs(self, lib):
         self.docs = p.get_all_documents_in_lib(lib)
         self.rows = [self.gen_row_tuple(i,a) for i,a in enumerate(self.docs)]
+        keys = set()
+        for d in self.docs:
+            keys.update(d.keys())
+        self.keys = list(keys)
         self.load_texts()
 
 
@@ -333,10 +333,10 @@ colpicker.setSelectionMode(QAbstractItemView.MultiSelection)
 try:
     colpicker.setRowHidden(lib.keys.index("title"), True)
     colpicker.setRowHidden(lib.keys.index("full_text"), True)
+    for h in lib.names:
+        colpicker.item(lib.keys.index(h)).setSelected(True)
 except:
     pass
-for h in lib.names:
-    colpicker.item(lib.keys.index(h)).setSelected(True)
 colpicker.itemSelectionChanged.connect(colpicker_change)
 colpicker.setFixedHeight(100)
 
