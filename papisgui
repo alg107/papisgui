@@ -253,8 +253,10 @@ def colpicker_change():
     model.beginResetModel()
     view.setColumnHidden(len(lib.names), False)
     currlib = libpicker.currentText()
-    newkeys = [lib.keys[a.row()] for a in colpicker.selectedIndexes()]
-    newkeys.insert(1,"title")
+    newkeys = []
+    if len(lib.keys)!=0:
+        newkeys = [lib.keys[a.row()] for a in colpicker.selectedIndexes()]
+        newkeys.insert(1,"title")
     newkeys = sort_cols(newkeys)
     lib.headers = newkeys.copy()
     lib.headers.append("id")
