@@ -180,11 +180,26 @@ def onkey(e):
     statusbar.showMessage(f"Row Count: {n}")
 
 def onlibchange(e):
+    colpicker.clear()
+    colpicker.addItems(lib.keys)
+    colpicker.setSelectionMode(QAbstractItemView.MultiSelection)
+    try:
+        colpicker.setRowHidden(lib.keys.index("title"), True)
+        colpicker.setRowHidden(lib.keys.index("full_text"), True)
+    except:
+        pass
+    try:
+        for h in names:
+            colpicker.item(lib.keys.index(h)).setSelected(True)
+    except:
+        pass
+    #colpicker_change()
     model.beginResetModel()
     newlib = libpicker.currentText()
     lib.load_docs(newlib)
     model.endResetModel()
     view.reset()
+    onresize(0)
     n = filtermodel.rowCount()
     statusbar.showMessage(f"Row Count: {n}")
 
@@ -333,6 +348,9 @@ colpicker.setSelectionMode(QAbstractItemView.MultiSelection)
 try:
     colpicker.setRowHidden(lib.keys.index("title"), True)
     colpicker.setRowHidden(lib.keys.index("full_text"), True)
+except:
+    pass
+try:
     for h in lib.names:
         colpicker.item(lib.keys.index(h)).setSelected(True)
 except:
