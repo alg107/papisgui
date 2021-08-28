@@ -5,58 +5,81 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import clipboard
 
-docs = []
-headers = ["Author", "Title", "Year", "id"]
-rows = []
-texts = []
+class Library:
+    def __init__(self, names, headers, coltypes, colweights):
+        self.headers = headers
+        self.headers.append("id")
+
+        self.names = names
+        self.coltypes = coltypes
+        self.colweights = colweights
+        self.load_docs(p.get_lib_name())
+
+        keys = set()
+        for d in self.docs:
+            keys.update(d.keys())
+        self.keys = list(keys)
+
+    def load_texts(self):
+        for j,i in enumerate(self.docs):
+            fldr = i.get_main_folder()
+            ftext = ""
+            try:
+                with open(f"{fldr}/text.txt", "r") as f:
+                    ftext = f.read()
+            except:
+                pass
+            self.docs[j]['full_text'] = ftext
+
+    def gen_row_tuple(self, i,a):
+        t = []
+        for j, h in enumerate(self.names):
+            if h == 'year':
+                t.append(str(a[h])+"     ")
+            else:
+                t.append(a[h])
+        t.append(i)
+        return tuple(t)
+
+    def load_docs(self, lib):
+        self.docs = p.get_all_documents_in_lib(lib)
+        self.rows = [self.gen_row_tuple(i,a) for i,a in enumerate(self.docs)]
+        self.load_texts()
+
+
+
+headers = ["Author", "Title", "Reference", "Year"]
+names = ['author', 'title', 'ref', 'year']
+coltypes = [QHeaderView.Fixed, QHeaderView.Stretch, QHeaderView.Fixed, QHeaderView.ResizeToContents]
+colweights = [1,3,1,0]
 
 extra_windows = []
 
-def load_texts(lib):
-    global docs
-    for j,i in enumerate(docs):
-        fldr = i.get_main_folder()
-        ftext = ""
-        try:
-            with open(f"{fldr}/text.txt", "r") as f:
-                ftext = f.read()
-        except:
-            pass
-        docs[j]['full_text'] = ftext
-
-def load_docs(lib):
-    global docs
-    global rows
-    docs = p.get_all_documents_in_lib(lib)
-    rows = [(a['author'], a['title'], str(a['year'])+"    ", i) for i,a in enumerate(docs)]
-    load_texts(lib)
-
-
-load_docs(p.get_lib_name())
+lib = Library(names, headers, coltypes, colweights)
 
 def docbyid(i):
-    return docs[i]
+    return lib.docs[i]
 
 
 class TableModel(QAbstractTableModel):
     def rowCount(self, parent):
-        return len(rows)
+        return len(lib.rows)
     def columnCount(self, parent):
-        return len(headers)
+        return len(lib.headers)
     def data(self, index, role):
         if role != Qt.DisplayRole:
             return QVariant()
-        return rows[index.row()][index.column()]
+        return lib.rows[index.row()][index.column()]
     def headerData(self, section, orientation, role):
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return QVariant()
-        return headers[section]
+        return lib.headers[section]
 
 class FilMo(QSortFilterProxyModel):
     def filterAcceptsRow(self, srow, sparent):
         bigbool = False
         re = str(self.filterRegExp().pattern()).lower()
-        for i, d in enumerate(headers[:-1]):
+        for i, d in enumerate(lib.headers[:-1]):
             colstr = str(self.sourceModel().index(srow,i).data()).lower()
             #print(re in colstr)
             bigbool = bigbool or (re in colstr)
@@ -65,7 +88,7 @@ class FilMo(QSortFilterProxyModel):
 class FilMo2(QSortFilterProxyModel):
     def filterAcceptsRow(self, srow, sparent):
         re = str(self.filterRegExp().pattern()).lower()
-        idd = self.sourceModel().index(srow,len(headers)-1).data()
+        idd = self.sourceModel().index(srow,len(lib.headers)-1).data()
         doc = docbyid(idd)
         return re in doc['full_text'].lower()
 
@@ -99,7 +122,7 @@ def click_row(e):
         idx = sm.selectedRows()[0].row()
     except:
         return 
-    idd = filtermodel.index(idx,len(headers)-1).data()
+    idd = filtermodel.index(idx,len(lib.headers)-1).data()
     doc = docbyid(idd)
     try:
         p.open_file(doc.get_files()[0])
@@ -113,7 +136,7 @@ def open_menu(pos):
     docs = []
     for i in idxs:
         idx = i.row()
-        idd = filtermodel.index(idx,len(headers)-1).data()
+        idd = filtermodel.index(idx,len(lib.headers)-1).data()
         doc = docbyid(idd)
         docs.append(doc)
     menu = QMenu()
@@ -159,17 +182,17 @@ def onkey(e):
 def onlibchange(e):
     model.beginResetModel()
     newlib = libpicker.currentText()
-    load_docs(newlib)
+    lib.load_docs(newlib)
     model.endResetModel()
     view.reset()
     n = filtermodel.rowCount()
     statusbar.showMessage(f"Row Count: {n}")
 
 def onresize(e):
-    view.setColumnWidth(0,int(view.width()/6.0))
-    view.setColumnWidth(1,int(view.width()/3.0))
-    view.setColumnWidth(2,int(view.width()/6.0))
-    #QWidget.resizeEvent(e)
+    for j, h in enumerate(lib.headers[:-1]):
+        weightsum = sum(lib.colweights)
+        if lib.coltypes[j] == QHeaderView.Fixed:
+            view.setColumnWidth(j,int(view.width()*(lib.colweights[j]/weightsum)))
 
 
 def tableKey(e):
@@ -189,47 +212,141 @@ def generalkey(e):
             libpicker.showPopup()
     QWidget.keyPressEvent(qw, e)
 
-mainlayout = QVBoxLayout()
+def hide_id():
+    pass
+    view.setColumnHidden(len(lib.names), True)
 
-model = TableModel()
+def sort_cols(cols):
+    masterorder = ["author", "title", "doi", "ref"]
+    newcols = []
+    for c in masterorder:
+        if c == "year":
+            break
+        if c in cols:
+            newcols.append(c)
+    if "year" in cols:
+        newcols.append("year")
+    for b in cols:
+        if b not in masterorder and b != "year":
+            if "year" in cols:
+                newcols.insert(-1,b)
+            else:
+                newcols.append(b)
+    return newcols
+
+def colpicker_change():
+    model.beginResetModel()
+    view.setColumnHidden(len(lib.names), False)
+    currlib = libpicker.currentText()
+    newkeys = [lib.keys[a.row()] for a in colpicker.selectedIndexes()]
+    newkeys.insert(1,"title")
+    newkeys = sort_cols(newkeys)
+    lib.headers = newkeys.copy()
+    lib.headers.append("id")
+    lib.names = newkeys
+    coltyp = newkeys.copy()
+    for i,key in enumerate(newkeys):
+        if key == "title":
+            coltyp[i] = QHeaderView.Stretch
+        elif key == "year":
+            coltyp[i] = QHeaderView.ResizeToContents
+        else:
+            coltyp[i] = QHeaderView.Fixed
+    lib.coltypes = coltyp
+    colw = newkeys.copy()
+    for i,key in enumerate(newkeys):
+        if key == "title":
+            colw[i] = 4
+        elif key == "author":
+            colw[i] = 2
+        else:
+            colw[i] = 1
+    lib.colweights = colw
+    #lib.colweights = [1]*len(newkeys)
+    lib.load_docs(currlib)
+    model.endResetModel()
+    for j, h in enumerate(lib.headers[:-1]):
+        view.horizontalHeader().setSectionResizeMode(j, lib.coltypes[j])
+    #view.reset()
+    #view.setColumnHidden(len(lib.names), True)
+    #print(view.isColumnHidden(len(lib.names)))
+    hide_id()
+    n = filtermodel.rowCount()
+    statusbar.showMessage(f"Row Count: {n}")
+
+def setup_tableview():
+    view.setSelectionBehavior(QAbstractItemView.SelectRows)
+    view.setModel(filtermodel)
+    view.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+
+    for j, h in enumerate(lib.headers[:-1]):
+        view.horizontalHeader().setSectionResizeMode(j, lib.coltypes[j])
+    view.resizeEvent = lambda _: view.setColumnWidth(0,int(view.width()/4.0))
+    #view.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+    view.verticalHeader().setVisible(False)
+    view.setColumnHidden(len(lib.names), True)
+    view.setContextMenuPolicy(Qt.CustomContextMenu)
+    view.customContextMenuRequested.connect(open_menu)
+    view.mouseDoubleClickEvent = click_row
+    view.keyPressEvent = tableKey
+
+def setup_models():
+    global interfiltermodel
+    global filtermodel
+    global model
+    global view
+
+    model = TableModel()
+    interfiltermodel = FilMo(None)
+    interfiltermodel.setSourceModel(model)
+    interfiltermodel.setFilterFixedString("")
+    #interfiltermodel.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+    filtermodel = FilMo2(None)
+    filtermodel.setSourceModel(interfiltermodel)
+    filtermodel.setFilterFixedString("")
+    #mainlayout.addWidget(view)
+
+
+#mainlayout = QVBoxLayout()
+mainlayout = QGridLayout()
+gridgroupbox = QGroupBox()
+gridlayout = QGridLayout()
+
 view = QTableView()
+
 
 sbar = QLineEdit()
 sbar2 = QLineEdit()
 sbar.setPlaceholderText("Search Metadata")
 sbar2.setPlaceholderText("Search In")
+sbar.keyPressEvent = onkey
+sbar2.keyPressEvent = onkey2
+
 libpicker = QComboBox()
 libpicker.addItems(p.get_libraries())
 libpicker.setCurrentText(p.get_lib_name())
 libpicker.currentTextChanged.connect(onlibchange)
-sbar.keyPressEvent = onkey
-sbar2.keyPressEvent = onkey2
-mainlayout.addWidget(libpicker)
-mainlayout.addWidget(sbar)
-mainlayout.addWidget(sbar2)
-#filtermodel = QSortFilterProxyModel()
-interfiltermodel = FilMo(None)
-interfiltermodel.setSourceModel(model)
-interfiltermodel.setFilterFixedString("")
-#interfiltermodel.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-filtermodel = FilMo2(None)
-filtermodel.setSourceModel(interfiltermodel)
-filtermodel.setFilterFixedString("")
 
-view.setSelectionBehavior(QAbstractItemView.SelectRows)
-view.setModel(filtermodel)
-view.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-view.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-view.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-view.resizeEvent = lambda _: view.setColumnWidth(0,int(view.width()/4.0))
-#view.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-view.verticalHeader().setVisible(False)
-view.setColumnHidden(len(headers)-1, True)
-view.setContextMenuPolicy(Qt.CustomContextMenu)
-view.customContextMenuRequested.connect(open_menu)
-view.mouseDoubleClickEvent = click_row
-view.keyPressEvent = tableKey
+colpicker = QListWidget()
+colpicker.addItems(lib.keys)
+colpicker.setSelectionMode(QAbstractItemView.MultiSelection)
+colpicker.setRowHidden(lib.keys.index("title"), True)
+colpicker.setRowHidden(lib.keys.index("full_text"), True)
+for h in lib.names:
+    colpicker.item(lib.keys.index(h)).setSelected(True)
+colpicker.itemSelectionChanged.connect(colpicker_change)
+colpicker.setFixedHeight(100)
+
+gridlayout.addWidget(libpicker)
+gridlayout.addWidget(sbar)
+gridlayout.addWidget(sbar2)
+gridlayout.addWidget(colpicker,0,1,0,2)
+gridgroupbox.setLayout(gridlayout)
+mainlayout.addWidget(gridgroupbox)
+#filtermodel = QSortFilterProxyModel()
+
+setup_models()
+setup_tableview()
 mainlayout.addWidget(view)
 
 statusbar = QStatusBar()
@@ -240,7 +357,7 @@ mainlayout.addWidget(statusbar)
 
 qw = QWidget()
 qw.setLayout(mainlayout)
-#qw.resizeEvent = onresize
+qw.resizeEvent = onresize
 qw.keyPressEvent = generalkey
 qw.resize(1000,600)
 qw.show()
