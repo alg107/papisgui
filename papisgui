@@ -142,6 +142,7 @@ def open_menu(pos):
     menu = QMenu()
     exportAction = menu.addAction("Export")
     propertiesAction = menu.addAction("Properties")
+    copyAction = menu.addAction("Copy")
     action = menu.exec_(view.mapToGlobal(pos))
     if len(docs) == 0: return
     if action == exportAction:
@@ -152,6 +153,8 @@ def open_menu(pos):
         win = ViewTree(docs[0])
         extra_windows.append(win)
         extra_windows[-1].show()
+    elif action == copyAction:
+        clipboard.copy(view.indexAt(pos).data())
 
 
 
