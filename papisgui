@@ -143,6 +143,7 @@ def open_menu(pos):
     exportAction = menu.addAction("Export")
     propertiesAction = menu.addAction("Properties")
     copyAction = menu.addAction("Copy")
+    deleteAction = menu.addAction("Delete")
     action = menu.exec_(view.mapToGlobal(pos))
     if len(docs) == 0: return
     if action == exportAction:
@@ -155,8 +156,8 @@ def open_menu(pos):
         extra_windows[-1].show()
     elif action == copyAction:
         clipboard.copy(view.indexAt(pos).data())
-
-
+    elif action == deleteAction:
+        pass
 
 app = QApplication([])
 #window = QWidget()
